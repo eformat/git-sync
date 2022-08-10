@@ -40,12 +40,12 @@ ALL_PLATFORMS := linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
 OS := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE ?= k8s.gcr.io/build-image/debian-base:bullseye-v1.4.0
+BASEIMAGE ?= registry.access.redhat.com/ubi8/ubi:8.6-754
 
 IMAGE := $(REGISTRY)/$(BIN)
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
-BUILD_IMAGE ?= golang:1.18-alpine
+BUILD_IMAGE ?= registry.redhat.io/rhel8/go-toolset:1.17.7-13
 
 DBG_MAKEFILE ?=
 ifneq ($(DBG_MAKEFILE),1)
@@ -153,7 +153,7 @@ $(LICENSES):
 ALLOW_STALE_APT ?=
 
 container: .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): bin/$(OS)_$(ARCH)/$(BIN) $(LICENSES) Dockerfile.in
+.container-$(DOTFILE_IMAGE): bin/$(OS)_$(ARCH)/$(BIN) $(LICENSES) Dockerfile.rh
 	sed                                  \
 	    -e 's|{ARG_BIN}|$(BIN)|g'        \
 	    -e 's|{ARG_ARCH}|$(ARCH)|g'      \
@@ -256,3 +256,21 @@ container-clean:
 
 bin-clean:
 	rm -rf .go bin
+
+
+# Hacks
+BASE_IMAGE ?= registry.access.redhat.com/ubi8/ubi:8.6-754
+BUILDER_IMAGE ?= registry.redhat.io/rhel8/go-toolset:1.17.7-13
+IMAGE=quay.io/eformat/git-sync
+TAG=3.5.1
+
+podman-build-image:
+	podman build \
+		--platform ${OS}/${ARCH} \
+		--build-arg GOARCH=$(ARCH) \
+		--build-arg BUILDER_IMAGE=$(BUILDER_IMAGE) \
+		--build-arg BASE_IMAGE=${BASE_IMAGE} \
+		-t $(IMAGE):$(TAG) \
+		--load \
+		-f Dockerfile.rh \
+		.
